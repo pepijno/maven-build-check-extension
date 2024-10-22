@@ -85,11 +85,13 @@ public class BuildCheckExecutionStrategy implements MojosExecutionStrategy {
                         || mojoExecution.getLifecyclePhase() == null
                         || lifecyclePhasesHelper.isLaterPhaseThanClean(mojoExecution.getLifecyclePhase())) {
                     mojoExecutionRunner.run(mojoExecution);
-                    if ("compile".equals(mojoExecution.getLifecyclePhase())) {
-                        removeDownstreamCacheFiles(session);
-                    }
-                    if ("install".equals(mojoExecution.getLifecyclePhase())) {
-                        buildCheckController.save(session);
+                    if (config.isBuildCheckEnabled()) {
+                        if ("compile".equals(mojoExecution.getLifecyclePhase())) {
+                            removeDownstreamCacheFiles(session);
+                        }
+                        if ("install".equals(mojoExecution.getLifecyclePhase())) {
+                            buildCheckController.save(session);
+                        }
                     }
                 }
             }

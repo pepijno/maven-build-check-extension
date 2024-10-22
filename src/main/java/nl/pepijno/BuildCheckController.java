@@ -115,7 +115,9 @@ public class BuildCheckController {
 
     void removeDownstreamCacheFiles(final MavenSession session, final MavenProject project) {
         for (var downstreamProject : session.getProjectDependencyGraph().getDownstreamProjects(project, true)) {
-            removeCacheFile(session, downstreamProject);
+            if (downstreamProject.hasParent() && downstreamProject.getParent().equals(project)) {
+                removeCacheFile(session, downstreamProject);
+            }
         }
     }
 
