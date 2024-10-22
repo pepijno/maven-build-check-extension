@@ -33,7 +33,7 @@ public class Config {
     private final MavenSession session;
 
     @Inject
-    public Config(MavenSession session) {
+    public Config(final MavenSession session) {
         this.session = session;
     }
 
@@ -41,8 +41,8 @@ public class Config {
         return getProperty(BUILD_CHECK_ENABLED, false);
     }
 
-    private boolean getProperty(String key, boolean defaultValue) {
-        String value = session.getUserProperties().getProperty(key);
+    private boolean getProperty(final String key, final boolean defaultValue) {
+        var value = session.getUserProperties().getProperty(key);
         if (value == null) {
             value = session.getSystemProperties().getProperty(key);
             if (value == null) {

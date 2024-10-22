@@ -46,7 +46,9 @@ public class BuildCheckExecutionStrategy implements MojosExecutionStrategy {
 
     @Inject
     public BuildCheckExecutionStrategy(
-            LifecyclePhasesHelper lifecyclePhasesHelper, BuildCheckController buildCheckController, Config config) {
+            final LifecyclePhasesHelper lifecyclePhasesHelper,
+            final BuildCheckController buildCheckController,
+            final Config config) {
         this.lifecyclePhasesHelper = lifecyclePhasesHelper;
         this.buildCheckController = buildCheckController;
         this.config = config;
@@ -54,54 +56,64 @@ public class BuildCheckExecutionStrategy implements MojosExecutionStrategy {
 
     @Override
     public void execute(
-            List<MojoExecution> mojoExecutions, MavenSession session, MojoExecutionRunner mojoExecutionRunner)
+            final List<MojoExecution> mojoExecutions,
+            final MavenSession session,
+            final MojoExecutionRunner mojoExecutionRunner)
             throws LifecycleExecutionException {
-        final var project = session.getCurrentProject();
-
         final var source = getSource(mojoExecutions);
 
         var shouldRebuild = true;
         if (source == MojoExecution.Source.LIFECYCLE) {
             var cleanPhase = lifecyclePhasesHelper.getCleanSegment(mojoExecutions);
-            for (MojoExecution mojoExecution : cleanPhase) {
+            for (var mojoExecution : cleanPhase) {
                 mojoExecutionRunner.run(mojoExecution);
+                removeCacheFile(session);
+                removeDownstreamCacheFiles(session);
             }
             if (!config.isBuildCheckEnabled()) {
                 LOG.info("Build check is disabled");
             } else if (!cleanPhase.isEmpty()) {
                 LOG.info("Clean present, build check is disabled");
             } else {
-                shouldRebuild = buildCheckController.shouldRebuild(session, project, mojoExecutions);
+                shouldRebuild = buildCheckController.shouldRebuild(session, mojoExecutions);
             }
         }
 
         if (shouldRebuild) {
-            for (MojoExecution mojoExecution : mojoExecutions) {
+            for (var mojoExecution : mojoExecutions) {
                 if (source == MojoExecution.Source.CLI
                         || mojoExecution.getLifecyclePhase() == null
                         || lifecyclePhasesHelper.isLaterPhaseThanClean(mojoExecution.getLifecyclePhase())) {
                     mojoExecutionRunner.run(mojoExecution);
                     if ("compile".equals(mojoExecution.getLifecyclePhase())) {
-                        LOG.debug("Removing downstream files for project {}", project);
-                        buildCheckController.removeCacheFiles(session, project);
+                        removeDownstreamCacheFiles(session);
                     }
                     if ("install".equals(mojoExecution.getLifecyclePhase())) {
-                        buildCheckController.save(session, project);
+                        buildCheckController.save(session);
                     }
                 }
             }
         }
     }
 
-    private MojoExecution.Source getSource(List<MojoExecution> mojoExecutions) {
+    private void removeCacheFile(final MavenSession session) {
+        LOG.debug("Removing cache file for project {}", session.getCurrentProject());
+        buildCheckController.removeCacheFile(session, session.getCurrentProject());
+    }
+
+    private void removeDownstreamCacheFiles(final MavenSession session) {
+        LOG.debug("Removing downstream cache files for project {}", session.getCurrentProject());
+        buildCheckController.removeDownstreamCacheFiles(session, session.getCurrentProject());
+    }
+
+    private MojoExecution.Source getSource(final List<MojoExecution> mojoExecutions) {
         if (mojoExecutions == null || mojoExecutions.isEmpty()) {
             return null;
         }
-        for (MojoExecution mojoExecution : mojoExecutions) {
-            if (mojoExecution.getSource() == MojoExecution.Source.CLI) {
-                return MojoExecution.Source.CLI;
-            }
-        }
-        return MojoExecution.Source.LIFECYCLE;
+        return mojoExecutions.stream()
+                .map(MojoExecution::getSource)
+                .filter(source -> source.equals(MojoExecution.Source.CLI))
+                .findFirst()
+                .orElse(MojoExecution.Source.LIFECYCLE);
     }
 }

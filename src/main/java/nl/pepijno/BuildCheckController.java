@@ -30,7 +30,6 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -52,25 +51,26 @@ public class BuildCheckController {
     private final LifecyclePhasesHelper lifecyclePhasesHelper;
 
     @Inject
-    public BuildCheckController(LifecyclePhasesHelper lifecyclePhasesHelper) {
+    public BuildCheckController(final LifecyclePhasesHelper lifecyclePhasesHelper) {
         this.lifecyclePhasesHelper = lifecyclePhasesHelper;
     }
 
-    boolean shouldRebuild(MavenSession session, MavenProject project, List<MojoExecution> mojoExecutions) {
-        final String highestPhase = lifecyclePhasesHelper.resolveHighestLifecyclePhase(mojoExecutions);
+    boolean shouldRebuild(final MavenSession session, final List<MojoExecution> mojoExecutions) {
+        final var highestPhase = lifecyclePhasesHelper.resolveHighestLifecyclePhase(mojoExecutions);
 
         if (!lifecyclePhasesHelper.isLaterPhaseThanClean(highestPhase)) {
             return true;
         }
 
-        var cacheFile = Utils.getCacheFile(session, project);
-        if (!Files.exists(Paths.get(cacheFile))) {
+        final var project = session.getCurrentProject();
+        var cacheFile = Utils.getCacheFile(session);
+        if (!Files.exists(cacheFile)) {
             LOG.debug("Cache file {} not found", cacheFile);
             return true;
         }
 
-        try (FileInputStream fis = new FileInputStream(cacheFile);
-                ObjectInputStream oos = new ObjectInputStream(fis)) {
+        try (var fis = new FileInputStream(cacheFile.toFile());
+                var oos = new ObjectInputStream(fis)) {
             boolean hasResults = findCommandHasResults(findNewerInSourceCommandString(project, cacheFile));
             if (hasResults) {
                 LOG.debug("Found newer file in src of project {}", project);
@@ -83,7 +83,7 @@ public class BuildCheckController {
             }
             var savedFiles = new HashSet<String>();
             savedFiles = (HashSet<String>) oos.readObject();
-            Set<String> files = findFiles(findInSourceCommandString(project));
+            var files = findFiles(findInSourceCommandString(project));
             files.addAll(findFiles(findInRootCommandString(project)));
             if (!files.equals(savedFiles)) {
                 LOG.debug("Current files in project {} do not match saved files", project);
@@ -98,11 +98,12 @@ public class BuildCheckController {
         }
     }
 
-    void save(final MavenSession session, final MavenProject project) {
-        var projectFilesFilename = Utils.getCacheFile(session, project);
-        try (FileOutputStream fos = new FileOutputStream(projectFilesFilename);
-                ObjectOutputStream oos = new ObjectOutputStream(fos)) {
-            Set<String> files = findFiles(findInSourceCommandString(project));
+    void save(final MavenSession session) {
+        final var project = session.getCurrentProject();
+        var projectFilesFilename = Utils.getCacheFile(session);
+        try (var fos = new FileOutputStream(projectFilesFilename.toFile());
+                var oos = new ObjectOutputStream(fos)) {
+            var files = findFiles(findInSourceCommandString(project));
             files.addAll(findFiles(findInRootCommandString(project)));
             LOG.info("Writing project files for project {}", project);
             oos.writeObject(files);
@@ -112,29 +113,32 @@ public class BuildCheckController {
         }
     }
 
-    void removeCacheFiles(final MavenSession session, final MavenProject project) {
-        for (MavenProject downstreamProject :
-                session.getProjectDependencyGraph().getDownstreamProjects(project, true)) {
-            try {
-                var projectFilesFilename = Utils.getCacheFile(session, downstreamProject);
-                Files.deleteIfExists(Path.of(projectFilesFilename));
-            } catch (IOException e) {
-                LOG.warn("Could not remove cache file for project {}", project);
-            }
+    void removeDownstreamCacheFiles(final MavenSession session, final MavenProject project) {
+        for (var downstreamProject : session.getProjectDependencyGraph().getDownstreamProjects(project, true)) {
+            removeCacheFile(session, downstreamProject);
         }
     }
 
-    private boolean findCommandHasResults(String findCommand) throws IOException, InterruptedException {
+    void removeCacheFile(final MavenSession session, final MavenProject project) {
+        try {
+            var projectFilesFilename = Utils.getCacheFile(session, project);
+            Files.deleteIfExists(projectFilesFilename);
+        } catch (IOException e) {
+            LOG.warn("Could not remove cache file for project {}", project);
+        }
+    }
+
+    private boolean findCommandHasResults(final String findCommand) throws IOException, InterruptedException {
         return !findFiles(findCommand).isEmpty();
     }
 
-    private Set<String> findFiles(String findCommand) throws IOException, InterruptedException {
-        ProcessBuilder mdfind = new ProcessBuilder("/bin/bash", "-c", findCommand);
+    private Set<String> findFiles(final String findCommand) throws IOException, InterruptedException {
+        var mdfind = new ProcessBuilder("/bin/bash", "-c", findCommand);
 
-        Process process = mdfind.start();
+        var process = mdfind.start();
 
-        Set<String> files = new HashSet<>();
-        BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+        var files = new HashSet<String>();
+        var reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
         String line;
         while ((line = reader.readLine()) != null) {
             files.add(line);
@@ -147,15 +151,15 @@ public class BuildCheckController {
         return FIND_CMD + " " + project.getBasedir().toPath().resolve("src") + " -type f";
     }
 
-    private String findNewerInSourceCommandString(final MavenProject project, final String referenceFile) {
-        return findInSourceCommandString(project) + " -newer " + referenceFile;
+    private String findNewerInSourceCommandString(final MavenProject project, final Path referenceFile) {
+        return findInSourceCommandString(project) + " -newer " + referenceFile.toString();
     }
 
     private String findInRootCommandString(final MavenProject project) {
         return FIND_CMD + " " + project.getBasedir() + " -maxdepth 1 -type f -not -name \".*\"";
     }
 
-    private String findNewerInRootCommandString(final MavenProject project, final String referenceFile) {
-        return findInRootCommandString(project) + " -newer " + referenceFile;
+    private String findNewerInRootCommandString(final MavenProject project, final Path referenceFile) {
+        return findInRootCommandString(project) + " -newer " + referenceFile.toString();
     }
 }

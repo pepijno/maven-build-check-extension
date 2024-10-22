@@ -21,7 +21,6 @@ package nl.pepijno;
 import javax.inject.Inject;
 import javax.inject.Named;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.maven.SessionScoped;
@@ -37,35 +36,28 @@ public class LifecyclePhasesHelper {
     private final String lastCleanPhase;
 
     @Inject
-    public LifecyclePhasesHelper(DefaultLifecycles defaultLifecycles, @Named("clean") Lifecycle cleanLifecycle) {
+    LifecyclePhasesHelper(final DefaultLifecycles defaultLifecycles, @Named("clean") final Lifecycle cleanLifecycle) {
         phases = defaultLifecycles.getLifeCycles().stream()
                 .flatMap(lf -> lf.getPhases().stream())
                 .toList();
         lastCleanPhase = Utils.getLast(cleanLifecycle.getPhases());
     }
 
-    String resolveHighestLifecyclePhase(List<MojoExecution> mojoExecutions) {
+    String resolveHighestLifecyclePhase(final List<MojoExecution> mojoExecutions) {
         return Utils.getLast(mojoExecutions).getLifecyclePhase();
     }
 
-    boolean isLaterPhaseThanClean(String phase) {
+    boolean isLaterPhaseThanClean(final String phase) {
         return isLaterPhase(phase, lastCleanPhase);
     }
 
-    List<MojoExecution> getCleanSegment(List<MojoExecution> mojoExecutions) {
-        List<MojoExecution> list = new ArrayList<>(mojoExecutions.size());
-        for (MojoExecution mojoExecution : mojoExecutions) {
-            String lifecyclePhase = mojoExecution.getLifecyclePhase();
-
-            if (isLaterPhaseThanClean(lifecyclePhase)) {
-                break;
-            }
-            list.add(mojoExecution);
-        }
-        return list;
+    List<MojoExecution> getCleanSegment(final List<MojoExecution> mojoExecutions) {
+        return mojoExecutions.stream()
+                .filter(mojoExecution -> !isLaterPhaseThanClean(mojoExecution.getLifecyclePhase()))
+                .toList();
     }
 
-    private boolean isLaterPhase(String phase, String other) {
+    private boolean isLaterPhase(final String phase, final String other) {
         if (!phases.contains(phase)) {
             throw new IllegalArgumentException("Unsupported phase: " + phase);
         }

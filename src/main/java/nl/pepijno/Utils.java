@@ -18,6 +18,7 @@
  */
 package nl.pepijno;
 
+import java.nio.file.Path;
 import java.util.List;
 import java.util.NoSuchElementException;
 
@@ -36,17 +37,23 @@ class Utils {
         throw new NoSuchElementException();
     }
 
-    static String getCacheFile(final MavenSession session, final MavenProject project) {
+    static Path getCacheFile(final MavenSession session) {
+        return getCacheFile(session, session.getCurrentProject());
+    }
+
+    static Path getCacheFile(final MavenSession session, final MavenProject project) {
         var path = getLocation(session, project);
-        return path + "/" + project.getArtifactId() + "-" + project.getVersion() + ".files";
+        return path.resolve(project.getArtifactId() + "-" + project.getVersion() + ".files");
     }
 
-    private static String getLocation(final MavenSession session, final MavenProject project) {
-        return getLocalRepository(session) + "/" + project.getGroupId().replace('.', '/') + "/"
-                + project.getArtifactId() + "/" + project.getVersion();
+    private static Path getLocation(final MavenSession session, final MavenProject project) {
+        return getLocalRepository(session)
+                .resolve(project.getGroupId().replace('.', '/'))
+                .resolve(project.getArtifactId())
+                .resolve(project.getVersion());
     }
 
-    private static String getLocalRepository(final MavenSession session) {
-        return session.getLocalRepository().getBasedir();
+    private static Path getLocalRepository(final MavenSession session) {
+        return Path.of(session.getLocalRepository().getBasedir());
     }
 }
