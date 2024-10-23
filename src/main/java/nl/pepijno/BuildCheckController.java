@@ -18,9 +18,15 @@
  */
 package nl.pepijno;
 
+import org.apache.maven.SessionScoped;
+import org.apache.maven.execution.MavenSession;
+import org.apache.maven.plugin.MojoExecution;
+import org.apache.maven.project.MavenProject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import javax.inject.Inject;
 import javax.inject.Named;
-
 import java.io.BufferedReader;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -33,13 +39,6 @@ import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-
-import org.apache.maven.SessionScoped;
-import org.apache.maven.execution.MavenSession;
-import org.apache.maven.plugin.MojoExecution;
-import org.apache.maven.project.MavenProject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 @SessionScoped
 @Named
@@ -114,10 +113,8 @@ public class BuildCheckController {
     }
 
     void removeDownstreamCacheFiles(final MavenSession session, final MavenProject project) {
-        for (var downstreamProject : session.getProjectDependencyGraph().getDownstreamProjects(project, true)) {
-            if (downstreamProject.hasParent() && downstreamProject.getParent().equals(project)) {
-                removeCacheFile(session, downstreamProject);
-            }
+        for (var downstreamProject : session.getProjectDependencyGraph().getDownstreamProjects(project, false)) {
+            removeCacheFile(session, downstreamProject);
         }
     }
 
