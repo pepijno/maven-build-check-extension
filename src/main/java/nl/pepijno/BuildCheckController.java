@@ -18,16 +18,11 @@
  */
 package nl.pepijno;
 
-import org.apache.maven.SessionScoped;
-import org.apache.maven.execution.MavenSession;
-import org.apache.maven.plugin.MojoExecution;
-import org.apache.maven.project.MavenProject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import javax.inject.Inject;
 import javax.inject.Named;
+
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -39,6 +34,13 @@ import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+
+import org.apache.maven.SessionScoped;
+import org.apache.maven.execution.MavenSession;
+import org.apache.maven.plugin.MojoExecution;
+import org.apache.maven.project.MavenProject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @SessionScoped
 @Named
@@ -120,8 +122,15 @@ public class BuildCheckController {
 
     void removeCacheFile(final MavenSession session, final MavenProject project) {
         try {
-            var projectFilesFilename = Utils.getCacheFile(session, project);
-            Files.deleteIfExists(projectFilesFilename);
+            var location = Utils.getLocation(session, project);
+            var prefix = Utils.getCacheFilenamePrefix(project);
+            if (Files.isDirectory(location)) {
+                for (File file : location.toFile().listFiles()) {
+                    if (file.getName().startsWith(prefix)) {
+                        Files.deleteIfExists(file.toPath());
+                    }
+                }
+            }
         } catch (IOException e) {
             LOG.warn("Could not remove cache file for project {}", project);
         }

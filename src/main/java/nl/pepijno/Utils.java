@@ -21,6 +21,7 @@ package nl.pepijno;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.stream.Collectors;
 
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.project.MavenProject;
@@ -43,10 +44,15 @@ class Utils {
 
     static Path getCacheFile(final MavenSession session, final MavenProject project) {
         var path = getLocation(session, project);
-        return path.resolve(project.getArtifactId() + "-" + project.getVersion() + ".files");
+        var profiles = getSortedProfilesAsString(session);
+        return path.resolve(getCacheFilenamePrefix(project) + "-" + profiles + ".files");
     }
 
-    private static Path getLocation(final MavenSession session, final MavenProject project) {
+    static String getCacheFilenamePrefix(final MavenProject project) {
+        return project.getArtifactId() + "-" + project.getVersion();
+    }
+
+    static Path getLocation(final MavenSession session, final MavenProject project) {
         return getLocalRepository(session)
                 .resolve(project.getGroupId().replace('.', '/'))
                 .resolve(project.getArtifactId())
@@ -55,5 +61,9 @@ class Utils {
 
     private static Path getLocalRepository(final MavenSession session) {
         return Path.of(session.getLocalRepository().getBasedir());
+    }
+
+    private static String getSortedProfilesAsString(final MavenSession session) {
+        return session.getRequest().getActiveProfiles().stream().sorted().collect(Collectors.joining("-"));
     }
 }

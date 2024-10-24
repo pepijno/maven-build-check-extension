@@ -19,9 +19,11 @@
 package nl.pepijno;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.NoSuchElementException;
 
 import org.apache.maven.artifact.repository.ArtifactRepository;
+import org.apache.maven.execution.MavenExecutionRequest;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.project.MavenProject;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,10 +46,13 @@ class UtilsTest {
         when(project.getGroupId()).thenReturn("group.id");
         when(project.getArtifactId()).thenReturn("artifact");
         when(project.getVersion()).thenReturn("version");
+        MavenExecutionRequest request = mock(MavenExecutionRequest.class);
+        when(request.getActiveProfiles()).thenReturn(List.of("profile1", "profile2"));
 
         session = mock(MavenSession.class);
         when(session.getLocalRepository()).thenReturn(localRepository);
         when(session.getCurrentProject()).thenReturn(project);
+        when(session.getRequest()).thenReturn(request);
     }
 
     @Test
@@ -71,6 +76,6 @@ class UtilsTest {
     void getCacheFile_shouldReturnLocationOfCacheFile() {
         assertThat(Utils.getCacheFile(session))
                 .asString()
-                .isEqualTo("/a/b/c/group/id/artifact/version/artifact-version.files");
+                .isEqualTo("/a/b/c/group/id/artifact/version/artifact-version-profile1-profile2.files");
     }
 }
