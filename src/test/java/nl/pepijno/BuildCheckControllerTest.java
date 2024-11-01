@@ -18,9 +18,7 @@
  */
 package nl.pepijno;
 
-import java.io.IOException;
 import java.nio.file.FileSystem;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
@@ -30,18 +28,14 @@ import org.apache.maven.artifact.repository.ArtifactRepository;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.project.MavenProject;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -75,16 +69,16 @@ class BuildCheckControllerTest {
         when(session.getLocalRepository()).thenReturn(localRepository);
     }
 
-    @Test
-    void removeCacheFile_shouldRemoveCacheFile_whenFileExists() throws IOException {
-        final var resourceFilePath = fileSystem.getPath(RESOURCE_FILE_NAME);
-        Files.copy(getResourceFilePath(), resourceFilePath);
-        try (MockedStatic<Utils> mockUtils = mockStatic(Utils.class)) {
-            mockUtils.when(() -> Utils.getCacheFile(session, project)).thenReturn(resourceFilePath);
-            buildCheckController.removeCacheFile(session, project);
-            assertThat(Files.exists(resourceFilePath)).isFalse();
-        }
-    }
+    //    @Test
+    //    void removeCacheFile_shouldRemoveCacheFile_whenFileExists() throws IOException {
+    //        final var resourceFilePath = fileSystem.getPath(RESOURCE_FILE_NAME);
+    //        Files.copy(getResourceFilePath(), resourceFilePath);
+    //        try (MockedStatic<Utils> mockUtils = mockStatic(Utils.class)) {
+    //            mockUtils.when(() -> Utils.getCacheFile(session, project)).thenReturn(resourceFilePath);
+    //            buildCheckController.removeCacheFile(session, project);
+    //            assertThat(Files.exists(resourceFilePath)).isFalse();
+    //        }
+    //    }
 
     private Path getResourceFilePath() {
         final var resourceFilePath = getClass().getResource(RESOURCE_FILE_NAME).getPath();

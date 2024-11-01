@@ -18,9 +18,15 @@
  */
 package nl.pepijno;
 
+import org.apache.maven.SessionScoped;
+import org.apache.maven.execution.MavenSession;
+import org.apache.maven.plugin.MojoExecution;
+import org.apache.maven.project.MavenProject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import javax.inject.Inject;
 import javax.inject.Named;
-
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileInputStream;
@@ -31,16 +37,12 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
-
-import org.apache.maven.SessionScoped;
-import org.apache.maven.execution.MavenSession;
-import org.apache.maven.plugin.MojoExecution;
-import org.apache.maven.project.MavenProject;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.stream.Collectors;
 
 @SessionScoped
 @Named
@@ -82,6 +84,12 @@ public class BuildCheckController {
                 LOG.debug("Found newer file in root of project {}", project);
                 return true;
             }
+            List<File> depFiles = getDependenciesCacheFiles(session, project);
+            hasResults = findCommandHasResults(findNewerInDepFiles(depFiles, cacheFile));
+            if (hasResults) {
+                LOG.debug("Found newer file in src of project {}", project);
+                return true;
+            }
             var savedFiles = new HashSet<String>();
             savedFiles = (HashSet<String>) oos.readObject();
             var files = findFiles(findInSourceCommandString(project));
@@ -89,14 +97,23 @@ public class BuildCheckController {
             if (!files.equals(savedFiles)) {
                 LOG.debug("Current files in project {} do not match saved files", project);
                 return true;
-            } else {
-                return false;
             }
+
+            return false;
         } catch (IOException | InterruptedException | ClassNotFoundException e) {
             LOG.warn("Could not read project files for project {}", project);
             LOG.debug(e.getMessage());
             return true;
         }
+    }
+
+    private List<File> getDependenciesCacheFiles(MavenSession session, MavenProject project) {
+        List<File> result = new ArrayList<>();
+        for (MavenProject upstreamProject : session.getProjectDependencyGraph().getUpstreamProjects(project, false)) {
+            Path upstreamCacheFile = Utils.getCacheFile(session, upstreamProject);
+            result.add(upstreamCacheFile.toFile());
+        }
+        return result;
     }
 
     void save(final MavenSession session) {
@@ -114,19 +131,16 @@ public class BuildCheckController {
         }
     }
 
-    void removeDownstreamCacheFiles(final MavenSession session, final MavenProject project) {
-        for (var downstreamProject : session.getProjectDependencyGraph().getDownstreamProjects(project, false)) {
-            removeCacheFile(session, downstreamProject);
-        }
-    }
-
     void removeCacheFile(final MavenSession session, final MavenProject project) {
         try {
             var location = Utils.getLocation(session, project);
             var prefix = Utils.getCacheFilenamePrefix(project);
+            LOG.info("Location {}, prefix {}", location, prefix);
             if (Files.isDirectory(location)) {
-                for (File file : location.toFile().listFiles()) {
+                File[] files = Objects.requireNonNullElse(location.toFile().listFiles(), new File[0]);
+                for (File file : files) {
                     if (file.getName().startsWith(prefix)) {
+                        LOG.info("Removing cache file {}", file);
                         Files.deleteIfExists(file.toPath());
                     }
                 }
@@ -169,5 +183,11 @@ public class BuildCheckController {
 
     private String findNewerInRootCommandString(final MavenProject project, final Path referenceFile) {
         return findInRootCommandString(project) + " -newer " + referenceFile.toString();
+    }
+
+    private String findNewerInDepFiles(final List<File> depFiles, final Path referenceFile) {
+        String joined =
+                depFiles.stream().map(File::getAbsoluteFile).map(File::toString).collect(Collectors.joining(" "));
+        return FIND_CMD + " " + joined + " -newer " + referenceFile.toString();
     }
 }

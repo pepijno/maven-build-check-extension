@@ -18,12 +18,6 @@
  */
 package nl.pepijno;
 
-import javax.annotation.Priority;
-import javax.inject.Inject;
-import javax.inject.Named;
-
-import java.util.List;
-
 import org.apache.maven.SessionScoped;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.lifecycle.LifecycleExecutionException;
@@ -32,6 +26,11 @@ import org.apache.maven.plugin.MojoExecutionRunner;
 import org.apache.maven.plugin.MojosExecutionStrategy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.annotation.Priority;
+import javax.inject.Inject;
+import javax.inject.Named;
+import java.util.List;
 
 @SessionScoped
 @Named
@@ -68,7 +67,6 @@ public class BuildCheckExecutionStrategy implements MojosExecutionStrategy {
             for (var mojoExecution : cleanPhase) {
                 mojoExecutionRunner.run(mojoExecution);
                 removeCacheFile(session);
-                removeDownstreamCacheFiles(session);
             }
             if (!config.isBuildCheckEnabled()) {
                 LOG.info("Build check is disabled");
@@ -85,13 +83,8 @@ public class BuildCheckExecutionStrategy implements MojosExecutionStrategy {
                         || mojoExecution.getLifecyclePhase() == null
                         || lifecyclePhasesHelper.isLaterPhaseThanClean(mojoExecution.getLifecyclePhase())) {
                     mojoExecutionRunner.run(mojoExecution);
-                    if (config.isBuildCheckEnabled()) {
-                        if ("compile".equals(mojoExecution.getLifecyclePhase())) {
-                            removeDownstreamCacheFiles(session);
-                        }
-                        if ("install".equals(mojoExecution.getLifecyclePhase())) {
-                            buildCheckController.save(session);
-                        }
+                    if (config.isBuildCheckEnabled() && "install".equals(mojoExecution.getLifecyclePhase())) {
+                        buildCheckController.save(session);
                     }
                 }
             }
@@ -101,11 +94,6 @@ public class BuildCheckExecutionStrategy implements MojosExecutionStrategy {
     private void removeCacheFile(final MavenSession session) {
         LOG.debug("Removing cache file for project {}", session.getCurrentProject());
         buildCheckController.removeCacheFile(session, session.getCurrentProject());
-    }
-
-    private void removeDownstreamCacheFiles(final MavenSession session) {
-        LOG.debug("Removing downstream cache files for project {}", session.getCurrentProject());
-        buildCheckController.removeDownstreamCacheFiles(session, session.getCurrentProject());
     }
 
     private MojoExecution.Source getSource(final List<MojoExecution> mojoExecutions) {
